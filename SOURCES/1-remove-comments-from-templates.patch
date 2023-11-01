@@ -1,0 +1,311 @@
+diff --git a/src/build/source_templates/compress.template b/src/build/source_templates/compress.template
+index 32008e9..09a5df4 100644
+--- a/src/build/source_templates/compress.template
++++ b/src/build/source_templates/compress.template
+@@ -31,7 +31,6 @@
+       main:
+       while (true) {
+ 
+-        // find a match
+         int forwardOff = sOff;
+ 
+         int ref;
+@@ -51,15 +50,12 @@
+           ${type}Utils.writeShort(hashTable, h, sOff - srcOff);
+         } while (!LZ4${utils}.readIntEquals(src, ref, sOff));
+ 
+-        // catch up
+         final int excess = LZ4${utils}.commonBytesBackward(src, ref, sOff, srcOff, anchor);
+         sOff -= excess;
+         ref -= excess;
+ 
+-        // sequence == refsequence
+         final int runLen = sOff - anchor;
+ 
+-        // encode literal length
+         int tokenOff = dOff++;
+ 
+         if (dOff + runLen + (2 + 1 + LAST_LITERALS) + (runLen >>> 8) > destEnd) {
+@@ -73,16 +69,13 @@
+           ${utils}.writeByte(dest, tokenOff, runLen << ML_BITS);
+         }
+ 
+-        // copy literals
+         LZ4${utils}.wildArraycopy(src, anchor, dest, dOff, runLen);
+         dOff += runLen;
+ 
+         while (true) {
+-          // encode offset
+           ${utils}.writeShortLE(dest, dOff, (short) (sOff - ref));
+           dOff += 2;
+ 
+-          // count nb matches
+           sOff += MIN_MATCH;
+           ref += MIN_MATCH;
+           final int matchLen = LZ4${utils}.commonBytes(src, ref, sOff, srcLimit);
+@@ -91,7 +84,6 @@
+           }
+           sOff += matchLen;
+ 
+-          // encode match len
+           if (matchLen >= ML_MASK) {
+             ${utils}.writeByte(dest, tokenOff, ${utils}.readByte(dest, tokenOff) | ML_MASK);
+             dOff = LZ4${utils}.writeLen(matchLen - ML_MASK, dest, dOff);
+@@ -99,16 +91,13 @@
+             ${utils}.writeByte(dest, tokenOff, ${utils}.readByte(dest, tokenOff) | matchLen);
+           }
+ 
+-          // test end of chunk
+           if (sOff > mflimit) {
+             anchor = sOff;
+             break main;
+           }
+ 
+-          // fill table
+           ${type}Utils.writeShort(hashTable, hash64k(${utils}.readInt(src, sOff - 2)), sOff - 2 - srcOff);
+ 
+-          // test next position
+           final int h = hash64k(${utils}.readInt(src, sOff));
+           ref = srcOff + ${type}Utils.readShort(hashTable, h);
+           ${type}Utils.writeShort(hashTable, h, sOff - srcOff);
+@@ -121,7 +110,6 @@
+           ${utils}.writeByte(dest, tokenOff, 0);
+         }
+ 
+-        // prepare next loop
+         anchor = sOff++;
+       }
+     }
+@@ -160,7 +148,6 @@
+     main:
+     while (true) {
+ 
+-      // find a match
+       int forwardOff = sOff;
+ 
+       int ref;
+@@ -187,10 +174,8 @@
+       sOff -= excess;
+       ref -= excess;
+ 
+-      // sequence == refsequence
+       final int runLen = sOff - anchor;
+ 
+-      // encode literal length
+       int tokenOff = dOff++;
+ 
+       if (dOff + runLen + (2 + 1 + LAST_LITERALS) + (runLen >>> 8) > destEnd) {
+@@ -204,16 +189,13 @@
+         ${utils}.writeByte(dest, tokenOff, runLen << ML_BITS);
+       }
+ 
+-      // copy literals
+       LZ4${utils}.wildArraycopy(src, anchor, dest, dOff, runLen);
+       dOff += runLen;
+ 
+       while (true) {
+-        // encode offset
+         ${utils}.writeShortLE(dest, dOff, back);
+         dOff += 2;
+ 
+-        // count nb matches
+         sOff += MIN_MATCH;
+         final int matchLen = LZ4${utils}.commonBytes(src, ref + MIN_MATCH, sOff, srcLimit);
+         if (dOff + (1 + LAST_LITERALS) + (matchLen >>> 8) > destEnd) {
+@@ -221,7 +203,6 @@
+         }
+         sOff += matchLen;
+ 
+-        // encode match len
+         if (matchLen >= ML_MASK) {
+           ${utils}.writeByte(dest, tokenOff, ${utils}.readByte(dest, tokenOff) | ML_MASK);
+           dOff = LZ4${utils}.writeLen(matchLen - ML_MASK, dest, dOff);
+@@ -229,16 +210,13 @@
+           ${utils}.writeByte(dest, tokenOff, ${utils}.readByte(dest, tokenOff) | matchLen);
+         }
+ 
+-        // test end of chunk
+         if (sOff > mflimit) {
+           anchor = sOff;
+           break main;
+         }
+ 
+-        // fill table
+         ${type}Utils.writeInt(hashTable, hash(${utils}.readInt(src, sOff - 2)), sOff - 2);
+ 
+-        // test next position
+         final int h = hash(${utils}.readInt(src, sOff));
+         ref = ${type}Utils.readInt(hashTable, h);
+         ${type}Utils.writeInt(hashTable, h, sOff);
+@@ -252,7 +230,6 @@
+         ${utils}.writeByte(dest, tokenOff, 0);
+       }
+ 
+-      // prepare next loop
+       anchor = sOff++;
+     }
+ 
+diff --git a/src/build/source_templates/compress_hc.template b/src/build/source_templates/compress_hc.template
+index 7179db3..7976ad1 100644
+--- a/src/build/source_templates/compress_hc.template
++++ b/src/build/source_templates/compress_hc.template
+@@ -47,7 +47,6 @@
+         continue;
+       }
+ 
+-      // saved, in case we would skip too much
+       copyTo(match1, match0);
+ 
+       search2:
+@@ -55,20 +54,19 @@
+         assert match1.start >= anchor;
+         if (match1.end() >= mfLimit
+             || !ht.insertAndFindWiderMatch(src, match1.end() - 2, match1.start + 1, matchLimit, match1.len, match2)) {
+-          // no better match
+           dOff = LZ4${utils}.encodeSequence(src, anchor, match1.start, match1.ref, match1.len, dest, dOff, destEnd);
+           anchor = sOff = match1.end();
+           continue main;
+         }
+ 
+         if (match0.start < match1.start) {
+-          if (match2.start < match1.start + match0.len) { // empirical
++          if (match2.start < match1.start + match0.len) {
+             copyTo(match0, match1);
+           }
+         }
+         assert match2.start > match1.start;
+ 
+-        if (match2.start - match1.start < 3) { // First Match too small : removed
++        if (match2.start - match1.start < 3) {
+           copyTo(match2, match1);
+           continue search2;
+         }
+@@ -91,21 +89,18 @@
+ 
+           if (match2.start + match2.len >= mfLimit
+               || !ht.insertAndFindWiderMatch(src, match2.end() - 3, match2.start, matchLimit, match2.len, match3)) {
+-            // no better match -> 2 sequences to encode
+             if (match2.start < match1.end()) {
+               match1.len = match2.start - match1.start;
+             }
+-            // encode seq 1
+             dOff = LZ4${utils}.encodeSequence(src, anchor, match1.start, match1.ref, match1.len, dest, dOff, destEnd);
+             anchor = sOff = match1.end();
+-            // encode seq 2
+             dOff = LZ4${utils}.encodeSequence(src, anchor, match2.start, match2.ref, match2.len, dest, dOff, destEnd);
+             anchor = sOff = match2.end();
+             continue main;
+           }
+ 
+-          if (match3.start < match1.end() + 3) { // Not enough space for match 2 : remove it
+-            if (match3.start >= match1.end()) { // // can write Seq1 immediately ==> Seq2 is removed, so Seq3 becomes Seq1
++          if (match3.start < match1.end() + 3) {
++            if (match3.start >= match1.end()) {
+               if (match2.start < match1.end()) {
+                 final int correction = match1.end() - match2.start;
+                 match2.fix(correction);
+@@ -127,7 +122,6 @@
+             continue search3;
+           }
+ 
+-          // OK, now we have 3 ascending matches; let's write at least the first one
+           if (match2.start < match1.end()) {
+             if (match2.start - match1.start < ML_MASK) {
+               if (match1.len > OPTIMAL_ML) {
+diff --git a/src/build/source_templates/decompress.template b/src/build/source_templates/decompress.template
+index f1c2890..1e2aa23 100644
+--- a/src/build/source_templates/decompress.template
++++ b/src/build/source_templates/decompress.template
+@@ -55,7 +55,6 @@
+       final int token = ${utils}.readByte(src, sOff) & 0xFF;
+       ++sOff;
+ 
+-      // literals
+       int literalLen = token >>> ML_BITS;
+       if (literalLen == RUN_MASK) {
+         byte len = (byte) 0xFF;
+@@ -81,7 +80,7 @@
+           LZ4${utils}.safeArraycopy(src, sOff, dest, dOff, literalLen);
+           sOff += literalLen;
+           dOff = literalCopyEnd;
+-          break; // EOF
++          break;
+         }
+       }
+ 
+@@ -89,7 +88,6 @@
+       sOff += literalLen;
+       dOff = literalCopyEnd;
+ 
+-      // matchs
+       final int matchDec = ${utils}.readShortLE(src, sOff);
+       sOff += 2;
+       int matchOff = dOff - matchDec;
+diff --git a/src/build/source_templates/hashtable.template b/src/build/source_templates/hashtable.template
+index 174f8e8..91935f5 100644
+--- a/src/build/source_templates/hashtable.template
++++ b/src/build/source_templates/hashtable.template
+@@ -92,8 +92,8 @@
+ 
+       int ref = hashPointer(buf, off);
+ 
+-      if (ref >= off - 4 && ref <= off && ref >= base) { // potential repetition
+-        if (LZ4${utils}.readIntEquals(buf, ref, off)) { // confirmed
++      if (ref >= off - 4 && ref <= off && ref >= base) {
++        if (LZ4${utils}.readIntEquals(buf, ref, off)) {
+           delta = off - ref;
+           repl = match.len = MIN_MATCH + LZ4${utils}.commonBytes(buf, ref + MIN_MATCH, off + MIN_MATCH, matchLimit);
+           match.ref = ref;
+@@ -119,7 +119,7 @@
+         int ptr = off;
+         final int end = off + repl - (MIN_MATCH - 1);
+         while (ptr < end - delta) {
+-          chainTable[ptr & MASK] = (short) delta; // pre load
++          chainTable[ptr & MASK] = (short) delta;
+           ++ptr;
+         }
+         do {
+diff --git a/src/build/source_templates/xxhash32_streaming.template b/src/build/source_templates/xxhash32_streaming.template
+index 6166758..9fa55e8 100644
+--- a/src/build/source_templates/xxhash32_streaming.template
++++ b/src/build/source_templates/xxhash32_streaming.template
+@@ -66,7 +66,7 @@ final class StreamingXXHash32Java${type} extends AbstractStreamingXXHash32Java {
+ 
+     totalLen += len;
+ 
+-    if (memSize + len < 16) { // fill in tmp buffer
++    if (memSize + len < 16) {
+       System.arraycopy(buf, off, memory, memSize, len);
+       memSize += len;
+       return;
+@@ -74,7 +74,7 @@ final class StreamingXXHash32Java${type} extends AbstractStreamingXXHash32Java {
+ 
+     final int end = off + len;
+ 
+-    if (memSize > 0) { // data left from previous update
++    if (memSize > 0) {
+       System.arraycopy(buf, off, memory, memSize, 16 - memSize);
+ 
+       v1 += readIntLE(memory, 0) * PRIME2;
+diff --git a/src/build/source_templates/xxhash64_streaming.template b/src/build/source_templates/xxhash64_streaming.template
+index 2789ae0..e781746 100644
+--- a/src/build/source_templates/xxhash64_streaming.template
++++ b/src/build/source_templates/xxhash64_streaming.template
+@@ -90,7 +90,7 @@ final class StreamingXXHash64Java${type} extends AbstractStreamingXXHash64Java {
+ 
+     totalLen += len;
+ 
+-    if (memSize + len < 32) { // fill in tmp buffer
++    if (memSize + len < 32) {
+       System.arraycopy(buf, off, memory, memSize, len);
+       memSize += len;
+       return;
+@@ -98,7 +98,7 @@ final class StreamingXXHash64Java${type} extends AbstractStreamingXXHash64Java {
+ 
+     final int end = off + len;
+ 
+-    if (memSize > 0) { // data left from previous update
++    if (memSize > 0) {
+       System.arraycopy(buf, off, memory, memSize, 32 - memSize);
+ 
+       v1 += readLongLE(memory, 0) * PRIME64_2;

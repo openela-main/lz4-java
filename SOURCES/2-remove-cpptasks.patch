@@ -1,0 +1,98 @@
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..01934f1
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,33 @@
++CC = gcc
++
++BUILD_DIR = build
++OBJECTS_DIR = $(BUILD_DIR)/objects
++JNI_HEADERS_DIR = $(BUILD_DIR)/jni-headers
++JNI_SOURCES_DIR = src/jni
++INCLUDE = -I $(JAVA_HOME)/include -I $(JAVA_HOME)/include/linux
++
++LIBS = -llz4 -lxxhash
++JNI_PREFIX = net_jpountz_
++
++default: all move_objects generate_so
++
++all:
++	$(CC) -fPIC -I $(JNI_HEADERS_DIR) \
++		$(INCLUDE) \
++		$(LIBS) \
++		-c $(JNI_SOURCES_DIR)/$(JNI_PREFIX)lz4_LZ4JNI.c
++
++	$(CC) -fPIC  -I $(JNI_HEADERS_DIR) \
++		$(INCLUDE) \
++		$(LIBS) \
++		-c $(JNI_SOURCES_DIR)/$(JNI_PREFIX)xxhash_XXHashJNI.c
++
++move_objects:
++	mv *.o $(OBJECTS_DIR)
++
++generate_so:
++	gcc -fPIC -shared \
++		$(OBJECTS_DIR)/*.o \
++		$(LIB_DIR)/liblz4.so \
++		$(LIB_DIR)/libxxhash.so \
++		-o $(BUILD_DIR)/jni/net/jpountz/util/$(PLATFORM)/$(ARCH)/liblz4-java.so
+diff --git a/build.xml b/build.xml
+index 1d4cff5..13d8ce3 100644
+--- a/build.xml
++++ b/build.xml
+@@ -13,7 +13,6 @@
+ -->
+ 
+ <project name="lz4" default="dist" basedir="."
+-    xmlns:cpptasks="antlib:net.sf.antcontrib.cpptasks"
+     xmlns:ivy="antlib:org.apache.ivy.ant"
+     xmlns:junit4="antlib:com.carrotsearch.junit4"
+     xmlns:mvn="antlib:org.apache.maven.artifact.ant">
+@@ -78,13 +77,6 @@
+     <get src="https://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.jar.version}/${ivy.jar.name}" dest="${user.home}/.ant/lib/${ivy.jar.name}"/>
+   </target>
+ 
+-  <target name="install-cpptasks" unless="cpptasks.available">
+-    <ivy:cachepath organisation="ant-contrib" module="cpptasks" revision="1.0b5"
+-      inline="true" conf="default" transitive="true" pathid="cpptasks.classpath"/>
+-    <taskdef uri="antlib:net.sf.antcontrib.cpptasks" resource="net/sf/antcontrib/cpptasks/antlib.xml" classpathref="cpptasks.classpath"/>
+-    <property name="cpptasks.available" value="true"/>
+-  </target>
+-
+   <target name="install-maven-ant-tasks" unless="maven-ant-tasks.available">
+     <ivy:cachepath organisation="org.apache.maven" module="maven-ant-tasks" revision="2.1.3"
+       inline="true" conf="default" transitive="true" pathid="maven-ant-tasks.classpath"/>
+@@ -184,27 +176,13 @@
+     </javah>
+   </target>
+ 
+-  <target name="compile-jni" depends="install-cpptasks,generate-headers" unless="${skip.jni}">
++  <target name="compile-jni" depends="generate-headers" unless="${skip.jni}">
+     <mkdir dir="${build}/objects" />
+     <mkdir dir="${build}/jni/net/jpountz/util/${platform}/${os.arch}" />
+-    <cpptasks:cc
+-      debug="false"
+-      optimize="extreme"
+-      objdir="${build}/objects"
+-      outfile="${build}/jni/net/jpountz/util/${platform}/${os.arch}/lz4-java"
+-      outtype="shared">
+-      <includepath path="${src}/lz4/lib" />
+-      <includepath path="${java.home}/../include" />
+-      <includepath path="${java.home}/../include/${platform}/" />
+-      <!-- In Java 9, java.home points not to jre/ but to the top directory -->
+-      <includepath path="${java.home}/include" />
+-      <includepath path="${java.home}/include/${platform}/" />
+-      <includepath path="${build}/jni-headers" />
+-      <fileset dir="${src}/lz4/lib" includes="lz4.c, lz4hc.c, xxhash.c" />
+-      <fileset dir="${src}/jni" includes="*.c" />
+-      <linker />
+-      <compilerarg value="-mmacosx-version-min=10.9" if="isMacOS"/>
+-    </cpptasks:cc>
++    <exec executable="make" failonerror="true">
++        <env key="ARCH" value="${os.arch}"/>
++        <env key="PLATFORM" value="${platform}"/>
++    </exec>
+   </target>
+ 
+   <target name="compile" depends="compile-java, compile-jni" />
