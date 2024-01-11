@@ -1,0 +1,797 @@
+diff --git a/.classpath b/.classpath
+index 5ee3f97..058b340 100644
+--- a/.classpath
++++ b/.classpath
+@@ -2,7 +2,6 @@
+ <classpath>
+ 	<classpathentry kind="src" path="src/java"/>
+ 	<classpathentry kind="src" path="build/java"/>
+-	<classpathentry kind="src" path="src/java-unsafe"/>
+ 	<classpathentry kind="src" path="src/test-resources"/>
+ 	<classpathentry kind="src" path="build/jni"/>
+ 	<classpathentry kind="src" path="src/test"/>
+diff --git a/CHANGES.md b/CHANGES.md
+index c7eed89..b71dc35 100644
+--- a/CHANGES.md
++++ b/CHANGES.md
+@@ -140,12 +140,6 @@
+  - [#99](https://github.com/lz4/lz4-java/pull/99)
+    LZ4FrameInputStream allows EndMark to be incompressible. (Charles Allen)
+ 
+- - [#95](https://github.com/lz4/lz4-java/pull/95)
+-   Added unsafe instance support for aarch64. (Yuqi Gu)
+-
+- - [#93](https://github.com/lz4/lz4-java/pull/93)
+-   Added unsafe instance support for ppc64le. (Madhusudanan Kandasamy)
+-
+  - [#90](https://github.com/lz4/lz4-java/issues/90)
+    LZ4 Java now supports 64-bit JNI build on Solaris. (cndcourt)
+ 
+@@ -207,11 +201,6 @@
+  - [#39](https://github.com/jpountz/lz4-java/pull/39)
+    The JAR is now a valid OSGI bundle. (Simon Chemouil)
+ 
+- - [#33](https://github.com/jpountz/lz4-java/pull/33)
+-   The implementation based on Java's sun.misc.Unsafe relies on unaligned
+-   memory access and is now only used on platforms that support it.
+-   (Dmitry Shohov)
+-
+ 
+ ## 1.2.0
+ 
+diff --git a/README.md b/README.md
+index 9a34ea6..b966d9a 100644
+--- a/README.md
++++ b/README.md
+@@ -24,12 +24,10 @@ decompressor instance.
+ 
+ ## Implementations
+ 
+-For LZ4 compressors, LZ4 HC compressors and decompressors, 3 implementations are
++For LZ4 compressors, LZ4 HC compressors and decompressors, 2 implementations are
+ available:
+  - JNI bindings to the original C implementation by Yann Collet,
+  - a pure Java port of the compression and decompression algorithms,
+- - a Java port that uses the sun.misc.Unsafe API in order to achieve compression
+-   and decompression speeds close to the C implementation.
+ 
+ Have a look at LZ4Factory for more information.
+ 
+@@ -94,8 +92,7 @@ score of 10) hash function.
+ 
+ ## Implementations
+ 
+-Similarly to LZ4, 3 implementations are available: JNI bindings, pure Java port
+-and pure Java port that uses sun.misc.Unsafe.
++Unsimilarly to LZ4, 2 implementations are available: JNI bindings, pure Java port
+ 
+ Have a look at XXHashFactory for more information.
+ 
+@@ -131,7 +128,7 @@ int hash = hash32.getValue();
+ 
+ You can download released artifacts from [Maven Central](https://search.maven.org/search?q=g:org.lz4%20a:lz4-java).
+ 
+-You can download pure-Java lz4-java from [Maven Central](https://search.maven.org/search?q=g:org.lz4%20a:lz4-pure-java). These artifacts include the Safe and Unsafe Java versions but not JNI bindings. (Experimental)
++You can download pure-Java lz4-java from [Maven Central](https://search.maven.org/search?q=g:org.lz4%20a:lz4-pure-java). These artifacts include the Safe Java versions but not JNI bindings. (Experimental)
+ 
+ # Documentation
+ 
+@@ -172,10 +169,8 @@ Then run `ant`. It will:
+    located under `src/build`,
+  - compile the lz4 and xxhash libraries and their JNI (Java Native Interface)
+    bindings,
+- - compile Java sources in `src/java` (normal sources), `src/java-unsafe`
+-   (sources that make use of `sun.misc.Unsafe`) and `build/java`
+-   (auto-generated sources) to `build/classes`, `build/unsafe-classes` and
+-   `build/generated-classes`,
++ - compile Java sources in `src/java` (normal sources) and `build/java`
++   (auto-generated sources) to `build/classes` and `build/generated-classes`,
+  - generate a JAR file called lz4-${version}.jar under the `dist` directory.
+ 
+ The JAR file that is generated contains Java class files, the native library
+diff --git a/build.xml b/build.xml
+index 2a08ad8..1d4cff5 100644
+--- a/build.xml
++++ b/build.xml
+@@ -148,16 +148,6 @@
+       debug="true"
+       destdir="${build}/classes"
+       nativeHeaderDir="${build}/jni-headers"/>
+-    <mkdir dir="${build}/unsafe-classes" />
+-    <javac
+-      includeAntRuntime="false"
+-      srcdir="${src}/java-unsafe"
+-      source="${javac.source}"
+-      target="${javac.target}"
+-      encoding="UTF-8"
+-      debug="true"
+-      classpath="${build}/classes"
+-      destdir="${build}/unsafe-classes"/>
+     <mkdir dir="${build}/generated-classes" />
+     <javac
+       includeAntRuntime="false"
+@@ -169,7 +159,6 @@
+       destdir="${build}/generated-classes">
+       <classpath>
+         <pathelement location="${build}/classes/" />
+-        <pathelement location="${build}/unsafe-classes" />
+       </classpath>
+     </javac>
+   </target>
+@@ -234,7 +223,6 @@
+ 
+   <path id="compile.tests.classpath">
+     <pathelement path="${build}/classes" />
+-    <pathelement path="${build}/unsafe-classes" />
+     <pathelement path="${build}/generated-classes" />
+     <fileset dir="lib" includes="*.jar" />
+   </path>
+@@ -249,7 +237,6 @@
+     <pathelement path="${src}/resources" />
+     <pathelement path="${src}/test-resources" />
+     <pathelement path="${build}/classes" />
+-    <pathelement path="${build}/unsafe-classes" />
+     <pathelement path="${build}/generated-classes" />
+     <pathelement path="${build}/test-classes" />
+     <fileset dir="${lib}" includes="*.jar" />
+@@ -317,7 +304,6 @@
+     <jar
+       destfile="${dist}/${ivy.module}-${ivy.revision}-sources.jar">
+       <fileset dir="${src}/java" />
+-      <fileset dir="${src}/java-unsafe" />
+     </jar>
+   </target>
+ 
+@@ -351,7 +337,6 @@
+       destfile="${dist}/${ivy.module}.jar">
+       <fileset dir="${src}/resources" erroronmissingdir="false" />
+       <fileset dir="${build}/classes" />
+-      <fileset dir="${build}/unsafe-classes" />
+       <fileset dir="${build}/generated-classes" />
+       <fileset dir="${build}/jni" erroronmissingdir="false" />
+       <manifest>
+@@ -365,7 +350,6 @@
+     <jar
+       destfile="${dist}/${ivy.module}.jar">
+       <fileset dir="${build}/classes" />
+-      <fileset dir="${build}/unsafe-classes" />
+       <fileset dir="${build}/generated-classes" />
+       <manifest>
+ 	<attribute name="Automatic-Module-Name" value="org.lz4.pure.java"/>
+@@ -411,15 +395,12 @@
+ 
+   <target name="forbidden-apis" description="check API usage" depends="install-forbidden-apis,compile">
+     <forbidden-apis internalRuntimeForbidden="true" classpathref="forbidden-apis.classpath">
+-      <bundledSignatures name="jdk-unsafe-${javac.target}"/>
+       <bundledSignatures name="jdk-deprecated-${javac.target}"/>
+       <fileset dir="${build}/classes" includes="**/*.class" />
+     </forbidden-apis>
+     <forbidden-apis classpathref="forbidden-apis.classpath">
+-      <bundledSignatures name="jdk-unsafe-${javac.target}"/>
+       <bundledSignatures name="jdk-deprecated-${javac.target}"/>
+       <fileset dir="${build}/classes" includes="**/*.class" />
+-      <fileset dir="${build}/unsafe-classes" includes="**/*.class" />
+     </forbidden-apis>
+   </target>
+ 
+diff --git a/src/build/gen_sources.mvel b/src/build/gen_sources.mvel
+index 0f32671..43ebb78 100644
+--- a/src/build/gen_sources.mvel
++++ b/src/build/gen_sources.mvel
+@@ -24,7 +24,7 @@ def dest_file(path) {
+ 
+ def generate_decompressors() {
+   compiledTemplate = get_template("decompressor.template");
+-  for (type : ["Safe", "Unsafe"]) {
++  for (type : ["Safe"]) {
+     for (size : ["Fast", "Safe"]) {
+       dest = dest_file("lz4/LZ4Java" + type + size + "Decompressor.java");
+       args = new HashMap();
+@@ -37,7 +37,7 @@ def generate_decompressors() {
+ 
+ def generate_compressors() {
+   compiledTemplate = get_template("compressor.template");
+-  for (type : ["Safe", "Unsafe"]) {
++  for (type : ["Safe"]) {
+     dest = dest_file("lz4/LZ4Java" + type + "Compressor.java");
+     args = new HashMap();
+     args.put("type", type);
+@@ -47,7 +47,7 @@ def generate_compressors() {
+ 
+ def generate_hc_compressors() {
+   compiledTemplate = get_template("compressor_hc.template");
+-  for (type : ["Safe", "Unsafe"]) {
++  for (type : ["Safe"]) {
+     dest = dest_file("lz4/LZ4HCJava" + type + "Compressor.java");
+     args = new HashMap();
+     args.put("type", type);
+@@ -58,7 +58,7 @@ def generate_hc_compressors() {
+ def generate_xxhash() {
+   for (bitness : ["32", "64"]) {
+     compiledTemplate = get_template("xxhash" + bitness + ".template");
+-    for (type : ["Safe", "Unsafe"]) {
++    for (type : ["Safe"]) {
+       dest = dest_file("xxhash/XXHash" + bitness + "Java" + type + ".java");
+       args = new HashMap();
+       args.put("type", type);
+@@ -70,7 +70,7 @@ def generate_xxhash() {
+ def generate_streaming_xxhash() {
+   for (bitness : ["32", "64"]) {
+     compiledTemplate = get_template("xxhash" + bitness + "_streaming.template");
+-    for (type : ["Safe", "Unsafe"]) {
++    for (type : ["Safe"]) {
+       dest = dest_file("xxhash/StreamingXXHash" + bitness + "Java" + type + ".java");
+       args = new HashMap();
+       args.put("type", type);
+diff --git a/src/java-unsafe/net/jpountz/lz4/LZ4UnsafeUtils.java b/src/java-unsafe/net/jpountz/lz4/LZ4UnsafeUtils.java
+deleted file mode 100644
+index a5ad783..0000000
+--- a/src/java-unsafe/net/jpountz/lz4/LZ4UnsafeUtils.java
++++ /dev/null
+@@ -1,206 +0,0 @@
+-package net.jpountz.lz4;
+-
+-/*
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-import static net.jpountz.lz4.LZ4Constants.COPY_LENGTH;
+-import static net.jpountz.lz4.LZ4Constants.LAST_LITERALS;
+-import static net.jpountz.lz4.LZ4Constants.ML_BITS;
+-import static net.jpountz.lz4.LZ4Constants.ML_MASK;
+-import static net.jpountz.lz4.LZ4Constants.RUN_MASK;
+-import static net.jpountz.util.UnsafeUtils.readByte;
+-import static net.jpountz.util.UnsafeUtils.readInt;
+-import static net.jpountz.util.UnsafeUtils.readLong;
+-import static net.jpountz.util.UnsafeUtils.readShort;
+-import static net.jpountz.util.UnsafeUtils.writeByte;
+-import static net.jpountz.util.UnsafeUtils.writeInt;
+-import static net.jpountz.util.UnsafeUtils.writeLong;
+-import static net.jpountz.util.UnsafeUtils.writeShort;
+-import static net.jpountz.util.Utils.NATIVE_BYTE_ORDER;
+-
+-import java.nio.ByteOrder;
+-
+-enum LZ4UnsafeUtils {
+-  ;
+-
+-  static void safeArraycopy(byte[] src, int srcOff, byte[] dest, int destOff, int len) {
+-    final int fastLen = len & 0xFFFFFFF8;
+-    wildArraycopy(src, srcOff, dest, destOff, fastLen);
+-    for (int i = 0, slowLen = len & 0x7; i < slowLen; i += 1) {
+-      writeByte(dest, destOff + fastLen + i, readByte(src, srcOff + fastLen + i));
+-    }
+-  }
+-
+-  static void wildArraycopy(byte[] src, int srcOff, byte[] dest, int destOff, int len) {
+-    for (int i = 0; i < len; i += 8) {
+-      writeLong(dest, destOff + i, readLong(src, srcOff + i));
+-    }
+-  }
+-
+-  static void wildIncrementalCopy(byte[] dest, int matchOff, int dOff, int matchCopyEnd) {
+-    if (dOff - matchOff < 4) {
+-      for (int i = 0; i < 4; ++i) {
+-        writeByte(dest, dOff+i, readByte(dest, matchOff+i));
+-      }
+-      dOff += 4;
+-      matchOff += 4;
+-      int dec = 0;
+-      assert dOff >= matchOff && dOff - matchOff < 8;
+-      switch (dOff - matchOff) {
+-      case 1:
+-        matchOff -= 3;
+-        break;
+-      case 2:
+-        matchOff -= 2;
+-        break;
+-      case 3:
+-        matchOff -= 3;
+-        dec = -1;
+-        break;
+-      case 5:
+-        dec = 1;
+-        break;
+-      case 6:
+-        dec = 2;
+-        break;
+-      case 7:
+-        dec = 3;
+-        break;
+-      default:
+-        break;
+-      }
+-      writeInt(dest, dOff, readInt(dest, matchOff));
+-      dOff += 4;
+-      matchOff -= dec;
+-    } else if (dOff - matchOff < COPY_LENGTH) {
+-      writeLong(dest, dOff, readLong(dest, matchOff));
+-      dOff += dOff - matchOff;
+-    }
+-    while (dOff < matchCopyEnd) {
+-      writeLong(dest, dOff, readLong(dest, matchOff));
+-      dOff += 8;
+-      matchOff += 8;
+-    }
+-  }
+-
+-  static void safeIncrementalCopy(byte[] dest, int matchOff, int dOff, int matchLen) {
+-    for (int i = 0; i < matchLen; ++i) {
+-      dest[dOff + i] = dest[matchOff + i];
+-      writeByte(dest, dOff + i, readByte(dest, matchOff + i));
+-    }
+-  }
+-
+-  static int readShortLittleEndian(byte[] src, int srcOff) {
+-    short s = readShort(src, srcOff);
+-    if (NATIVE_BYTE_ORDER == ByteOrder.BIG_ENDIAN) {
+-      s = Short.reverseBytes(s);
+-    }
+-    return s & 0xFFFF;
+-  }
+-
+-  static void writeShortLittleEndian(byte[] dest, int destOff, int value) {
+-    short s = (short) value;
+-    if (NATIVE_BYTE_ORDER == ByteOrder.BIG_ENDIAN) {
+-      s = Short.reverseBytes(s);
+-    }
+-    writeShort(dest, destOff, s);
+-  }
+-
+-  static boolean readIntEquals(byte[] src, int ref, int sOff) {
+-    return readInt(src, ref) == readInt(src, sOff);
+-  }
+-
+-  static int commonBytes(byte[] src, int ref, int sOff, int srcLimit) {
+-    int matchLen = 0;
+-    while (sOff <= srcLimit - 8) {
+-      if (readLong(src, sOff) == readLong(src, ref)) {
+-        matchLen += 8;
+-        ref += 8;
+-        sOff += 8;
+-      } else {
+-        final int zeroBits;
+-        if (NATIVE_BYTE_ORDER == ByteOrder.BIG_ENDIAN) {
+-          zeroBits = Long.numberOfLeadingZeros(readLong(src, sOff) ^ readLong(src, ref));
+-        } else {
+-          zeroBits = Long.numberOfTrailingZeros(readLong(src, sOff) ^ readLong(src, ref));
+-        }
+-        return matchLen + (zeroBits >>> 3);
+-      }
+-    }
+-    while (sOff < srcLimit && readByte(src, ref++) == readByte(src, sOff++)) {
+-      ++matchLen;
+-    }
+-    return matchLen;
+-  }
+-
+-  static int writeLen(int len, byte[] dest, int dOff) {
+-    while (len >= 0xFF) {
+-      writeByte(dest, dOff++, 0xFF);
+-      len -= 0xFF;
+-    }
+-    writeByte(dest, dOff++, len);
+-    return dOff;
+-  }
+-
+-  static int encodeSequence(byte[] src, int anchor, int matchOff, int matchRef, int matchLen, byte[] dest, int dOff, int destEnd) {
+-    final int runLen = matchOff - anchor;
+-    final int tokenOff = dOff++;
+-    int token;
+-
+-    if (runLen >= RUN_MASK) {
+-      token = (byte) (RUN_MASK << ML_BITS);
+-      dOff = writeLen(runLen - RUN_MASK, dest, dOff);
+-    } else {
+-      token = runLen << ML_BITS;
+-    }
+-
+-    // copy literals
+-    wildArraycopy(src, anchor, dest, dOff, runLen);
+-    dOff += runLen;
+-
+-    // encode offset
+-    final int matchDec = matchOff - matchRef;
+-    dest[dOff++] = (byte) matchDec;
+-    dest[dOff++] = (byte) (matchDec >>> 8);
+-
+-    // encode match len
+-    matchLen -= 4;
+-    if (dOff + (1 + LAST_LITERALS) + (matchLen >>> 8) > destEnd) {
+-      throw new LZ4Exception("maxDestLen is too small");
+-    }
+-    if (matchLen >= ML_MASK) {
+-      token |= ML_MASK;
+-      dOff = writeLen(matchLen - RUN_MASK, dest, dOff);
+-    } else {
+-      token |= matchLen;
+-    }
+-
+-    dest[tokenOff] = (byte) token;
+-
+-    return dOff;
+-  }
+-
+-  static int commonBytesBackward(byte[] b, int o1, int o2, int l1, int l2) {
+-    int count = 0;
+-    while (o1 > l1 && o2 > l2 && readByte(b, --o1) == readByte(b, --o2)) {
+-      ++count;
+-    }
+-    return count;
+-  }
+-
+-  static int lastLiterals(byte[] src, int sOff, int srcLen, byte[] dest, int dOff, int destEnd) {
+-    return LZ4SafeUtils.lastLiterals(src, sOff, srcLen, dest, dOff, destEnd);
+-  }
+-
+-}
+diff --git a/src/java-unsafe/net/jpountz/util/UnsafeUtils.java b/src/java-unsafe/net/jpountz/util/UnsafeUtils.java
+deleted file mode 100644
+index 30231ef..0000000
+--- a/src/java-unsafe/net/jpountz/util/UnsafeUtils.java
++++ /dev/null
+@@ -1,147 +0,0 @@
+-package net.jpountz.util;
+-
+-/*
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-import static net.jpountz.util.Utils.NATIVE_BYTE_ORDER;
+-
+-import java.lang.reflect.Field;
+-import java.nio.ByteOrder;
+-
+-import sun.misc.Unsafe;
+-
+-public enum UnsafeUtils {
+-  ;
+-
+-  private static final Unsafe UNSAFE;
+-  private static final long BYTE_ARRAY_OFFSET;
+-  private static final int BYTE_ARRAY_SCALE;
+-  private static final long INT_ARRAY_OFFSET;
+-  private static final int INT_ARRAY_SCALE;
+-  private static final long SHORT_ARRAY_OFFSET;
+-  private static final int SHORT_ARRAY_SCALE;
+-  
+-  static {
+-    try {
+-      Field theUnsafe = Unsafe.class.getDeclaredField("theUnsafe");
+-      theUnsafe.setAccessible(true);
+-      UNSAFE = (Unsafe) theUnsafe.get(null);
+-      BYTE_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(byte[].class);
+-      BYTE_ARRAY_SCALE = UNSAFE.arrayIndexScale(byte[].class);
+-      INT_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(int[].class);
+-      INT_ARRAY_SCALE = UNSAFE.arrayIndexScale(int[].class);
+-      SHORT_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(short[].class);
+-      SHORT_ARRAY_SCALE = UNSAFE.arrayIndexScale(short[].class);
+-    } catch (IllegalAccessException e) {
+-      throw new ExceptionInInitializerError("Cannot access Unsafe");
+-    } catch (NoSuchFieldException e) {
+-      throw new ExceptionInInitializerError("Cannot access Unsafe");
+-    } catch (SecurityException e) {
+-      throw new ExceptionInInitializerError("Cannot access Unsafe");
+-    }
+-  }
+-
+-  public static void checkRange(byte[] buf, int off) {
+-    SafeUtils.checkRange(buf, off);
+-  }
+-
+-  public static void checkRange(byte[] buf, int off, int len) {
+-    SafeUtils.checkRange(buf, off, len);
+-  }
+-
+-  public static void checkLength(int len) {
+-    SafeUtils.checkLength(len);
+-  }
+-
+-  public static byte readByte(byte[] src, int srcOff) {
+-    return UNSAFE.getByte(src, BYTE_ARRAY_OFFSET + BYTE_ARRAY_SCALE * srcOff);
+-  }
+-
+-  public static void writeByte(byte[] src, int srcOff, byte value) {
+-    UNSAFE.putByte(src, BYTE_ARRAY_OFFSET + BYTE_ARRAY_SCALE * srcOff, (byte) value);
+-  }
+-
+-  public static void writeByte(byte[] src, int srcOff, int value) {
+-    writeByte(src, srcOff, (byte) value);
+-  }
+-
+-  public static long readLong(byte[] src, int srcOff) {
+-    return UNSAFE.getLong(src, BYTE_ARRAY_OFFSET + srcOff);
+-  }
+-
+-  public static long readLongLE(byte[] src, int srcOff) {
+-    long i = readLong(src, srcOff);
+-    if (NATIVE_BYTE_ORDER == ByteOrder.BIG_ENDIAN) {
+-      i = Long.reverseBytes(i);
+-    }
+-    return i;
+-  }
+-
+-  public static void writeLong(byte[] dest, int destOff, long value) {
+-    UNSAFE.putLong(dest, BYTE_ARRAY_OFFSET + destOff, value);
+-  }
+-
+-  public static int readInt(byte[] src, int srcOff) {
+-    return UNSAFE.getInt(src, BYTE_ARRAY_OFFSET + srcOff);
+-  }
+-
+-  public static int readIntLE(byte[] src, int srcOff) {
+-    int i = readInt(src, srcOff);
+-    if (NATIVE_BYTE_ORDER == ByteOrder.BIG_ENDIAN) {
+-      i = Integer.reverseBytes(i);
+-    }
+-    return i;
+-  }
+-
+-  public static void writeInt(byte[] dest, int destOff, int value) {
+-    UNSAFE.putInt(dest, BYTE_ARRAY_OFFSET + destOff, value);
+-  }
+-
+-  public static short readShort(byte[] src, int srcOff) {
+-    return UNSAFE.getShort(src, BYTE_ARRAY_OFFSET + srcOff);
+-  }
+-
+-  public static int readShortLE(byte[] src, int srcOff) {
+-    short s = readShort(src, srcOff);
+-    if (NATIVE_BYTE_ORDER == ByteOrder.BIG_ENDIAN) {
+-      s = Short.reverseBytes(s);
+-    }
+-    return s & 0xFFFF;
+-  }
+-
+-  public static void writeShort(byte[] dest, int destOff, short value) {
+-    UNSAFE.putShort(dest, BYTE_ARRAY_OFFSET + destOff, value);
+-  }
+-
+-  public static void writeShortLE(byte[] buf, int off, int v) {
+-    writeByte(buf, off, (byte) v);
+-    writeByte(buf, off + 1, (byte) (v >>> 8));
+-  }
+-
+-  public static int readInt(int[] src, int srcOff) {
+-    return UNSAFE.getInt(src, INT_ARRAY_OFFSET + INT_ARRAY_SCALE * srcOff);
+-  }
+-
+-  public static void writeInt(int[] dest, int destOff, int value) {
+-    UNSAFE.putInt(dest, INT_ARRAY_OFFSET + INT_ARRAY_SCALE * destOff, value);
+-  }
+-
+-  public static int readShort(short[] src, int srcOff) {
+-    return UNSAFE.getShort(src, SHORT_ARRAY_OFFSET + SHORT_ARRAY_SCALE * srcOff) & 0xFFFF;
+-  }
+-
+-  public static void writeShort(short[] dest, int destOff, int value) {
+-    UNSAFE.putShort(dest, SHORT_ARRAY_OFFSET + SHORT_ARRAY_SCALE * destOff, (short) value);
+-  }
+-}
+diff --git a/src/java/net/jpountz/lz4/LZ4Factory.java b/src/java/net/jpountz/lz4/LZ4Factory.java
+index e04867b..69f81fa 100644
+--- a/src/java/net/jpountz/lz4/LZ4Factory.java
++++ b/src/java/net/jpountz/lz4/LZ4Factory.java
+@@ -32,8 +32,6 @@ import static net.jpountz.lz4.LZ4Constants.MAX_COMPRESSION_LEVEL;
+  * <a href="https://github.com/lz4/lz4">the original LZ4 C implementation</a>.
+  * <li>a {@link #safeInstance() safe Java} instance which is a pure Java port
+  * of the original C library,</li>
+- * <li>an {@link #unsafeInstance() unsafe Java} instance which is a Java port
+- * using the unofficial {@link sun.misc.Unsafe} API.
+  * </ul>
+  * <p>
+  * Only the {@link #safeInstance() safe instance} is guaranteed to work on your
+@@ -55,7 +53,6 @@ public final class LZ4Factory {
+   }
+ 
+   private static LZ4Factory NATIVE_INSTANCE,
+-                            JAVA_UNSAFE_INSTANCE,
+                             JAVA_SAFE_INSTANCE;
+ 
+   /**
+@@ -107,42 +104,15 @@ public final class LZ4Factory {
+     return JAVA_SAFE_INSTANCE;
+   }
+ 
+-  /**
+-   * Returns a {@link LZ4Factory} instance that returns compressors and
+-   * decompressors that may use {@link sun.misc.Unsafe} to speed up compression
+-   * and decompression.
+-   *
+-   * @return a {@link LZ4Factory} instance that returns compressors and
+-   * decompressors that may use {@link sun.misc.Unsafe} to speed up compression
+-   * and decompression.
+-   */
+-  public static synchronized LZ4Factory unsafeInstance() {
+-    if (JAVA_UNSAFE_INSTANCE == null) {
+-      JAVA_UNSAFE_INSTANCE = instance("JavaUnsafe");
+-    }
+-    return JAVA_UNSAFE_INSTANCE;
+-  }
+-
+   /**
+    * Returns the fastest available {@link LZ4Factory} instance which does not
+-   * rely on JNI bindings. It first tries to load the
+-   * {@link #unsafeInstance() unsafe instance}, and then the
+-   * {@link #safeInstance() safe Java instance} if the JVM doesn't have a
+-   * working {@link sun.misc.Unsafe}.
++   * rely on JNI bindings. It loads {@link #safeInstance() safe Java instance}
+    *
+    * @return the fastest available {@link LZ4Factory} instance which does not
+    * rely on JNI bindings.
+    */
+   public static LZ4Factory fastestJavaInstance() {
+-    if (Utils.isUnalignedAccessAllowed()) {
+-      try {
+-        return unsafeInstance();
+-      } catch (Throwable t) {
+-        return safeInstance();
+-      }
+-    } else {
+       return safeInstance();
+-    }
+   }
+ 
+   /**
+@@ -249,9 +219,9 @@ public final class LZ4Factory {
+    *   <li>A compression level lower than 1 would be treated as 9.</li>
+    * </ol>
+    * Note that compression levels from different implementations
+-   * (native, unsafe Java, and safe Java) cannot be compared with one another.
++   * (native, and safe Java) cannot be compared with one another.
+    * Specifically, the native implementation of a high compression level
+-   * is not necessarily faster than the safe/unsafe Java implementation
++   * is not necessarily faster than the safe Java implementation
+    * of the same compression level.
+    *
+    * @param compressionLevel the compression level between [1, 17]; the higher the level, the higher the compression ratio
+diff --git a/src/java/net/jpountz/xxhash/XXHashFactory.java b/src/java/net/jpountz/xxhash/XXHashFactory.java
+index 9a9b4d1..9ccdf76 100644
+--- a/src/java/net/jpountz/xxhash/XXHashFactory.java
++++ b/src/java/net/jpountz/xxhash/XXHashFactory.java
+@@ -28,8 +28,6 @@ import net.jpountz.util.Utils;
+  * <a href="http://code.google.com/p/xxhash/">the original LZ4 C implementation</a>.
+  * <li>a {@link #safeInstance() safe Java} instance which is a pure Java port
+  * of the original C library,</li>
+- * <li>an {@link #unsafeInstance() unsafe Java} instance which is a Java port
+- * using the unofficial {@link sun.misc.Unsafe} API.
+  * </ul>
+  * <p>
+  * Only the {@link #safeInstance() safe instance} is guaranteed to work on your
+@@ -51,7 +49,6 @@ public final class XXHashFactory {
+   }
+ 
+   private static XXHashFactory NATIVE_INSTANCE,
+-                               JAVA_UNSAFE_INSTANCE,
+                                JAVA_SAFE_INSTANCE;
+ 
+   /**
+@@ -96,40 +93,15 @@ public final class XXHashFactory {
+     return JAVA_SAFE_INSTANCE;
+   }
+ 
+-  /**
+-   * Returns a {@link XXHashFactory} that returns {@link XXHash32} instances that
+-   *  may use {@link sun.misc.Unsafe} to speed up hashing.
+-   *
+-   * @return a {@link XXHashFactory} that returns {@link XXHash32} instances that
+-   *  may use {@link sun.misc.Unsafe} to speed up hashing.
+-   */
+-  public static synchronized XXHashFactory unsafeInstance() {
+-    if (JAVA_UNSAFE_INSTANCE == null) {
+-      JAVA_UNSAFE_INSTANCE = instance("JavaUnsafe");
+-    }
+-    return JAVA_UNSAFE_INSTANCE;
+-  }
+-
+   /**
+    * Returns the fastest available {@link XXHashFactory} instance which does not
+-   * rely on JNI bindings. It first tries to load the
+-   * {@link #unsafeInstance() unsafe instance}, and then the
+-   * {@link #safeInstance() safe Java instance} if the JVM doesn't have a
+-   * working {@link sun.misc.Unsafe}.
++   * rely on JNI bindings. It loads {@link #safeInstance() safe instance}
+    *
+    * @return the fastest available {@link XXHashFactory} instance which does not
+    * rely on JNI bindings.
+    */
+   public static XXHashFactory fastestJavaInstance() {
+-    if (Utils.isUnalignedAccessAllowed()) {
+-      try {
+-        return unsafeInstance();
+-      } catch (Throwable t) {
+-        return safeInstance();
+-      }
+-    } else {
+       return safeInstance();
+-    }
+   }
+ 
+   /**
+diff --git a/src/test/net/jpountz/lz4/Instances.java b/src/test/net/jpountz/lz4/Instances.java
+index b9caae5..44f7809 100644
+--- a/src/test/net/jpountz/lz4/Instances.java
++++ b/src/test/net/jpountz/lz4/Instances.java
+@@ -21,21 +21,17 @@ enum Instances {
+   static LZ4Compressor[] COMPRESSORS = new LZ4Compressor[] {
+     LZ4Factory.nativeInstance().fastCompressor(),
+     LZ4Factory.nativeInstance().highCompressor(),
+-    LZ4Factory.unsafeInstance().fastCompressor(),
+-    LZ4Factory.unsafeInstance().highCompressor(),
+     LZ4Factory.safeInstance().fastCompressor(),
+     LZ4Factory.safeInstance().highCompressor()
+   };
+ 
+   static LZ4FastDecompressor[] FAST_DECOMPRESSORS = new LZ4FastDecompressor[] {
+     LZ4Factory.nativeInstance().fastDecompressor(),
+-    LZ4Factory.unsafeInstance().fastDecompressor(),
+     LZ4Factory.safeInstance().fastDecompressor()
+   };
+ 
+   static LZ4SafeDecompressor[] SAFE_DECOMPRESSORS = new LZ4SafeDecompressor[] {
+     LZ4Factory.nativeInstance().safeDecompressor(),
+-    LZ4Factory.unsafeInstance().safeDecompressor(),
+     LZ4Factory.safeInstance().safeDecompressor()
+   };
+ 
+diff --git a/src/test/net/jpountz/lz4/LZ4FactoryTest.java b/src/test/net/jpountz/lz4/LZ4FactoryTest.java
+index c4ef05e..b8b33d7 100644
+--- a/src/test/net/jpountz/lz4/LZ4FactoryTest.java
++++ b/src/test/net/jpountz/lz4/LZ4FactoryTest.java
+@@ -21,17 +21,13 @@ public class LZ4FactoryTest extends TestCase {
+   public void test() {
+     assertEquals(LZ4JNICompressor.INSTANCE, LZ4Factory.nativeInstance().fastCompressor());
+     assertEquals(LZ4HCJNICompressor.INSTANCE, LZ4Factory.nativeInstance().highCompressor());
+-    assertEquals(LZ4JavaUnsafeCompressor.INSTANCE, LZ4Factory.unsafeInstance().fastCompressor());
+-    assertEquals(LZ4HCJavaUnsafeCompressor.INSTANCE, LZ4Factory.unsafeInstance().highCompressor());
+     assertEquals(LZ4JavaSafeCompressor.INSTANCE, LZ4Factory.safeInstance().fastCompressor());
+     assertEquals(LZ4HCJavaSafeCompressor.INSTANCE, LZ4Factory.safeInstance().highCompressor());
+ 
+     assertEquals(LZ4JNIFastDecompressor.INSTANCE, LZ4Factory.nativeInstance().fastDecompressor());
+-    assertEquals(LZ4JavaUnsafeFastDecompressor.INSTANCE, LZ4Factory.unsafeInstance().fastDecompressor());
+     assertEquals(LZ4JavaSafeFastDecompressor.INSTANCE, LZ4Factory.safeInstance().fastDecompressor());
+ 
+     assertEquals(LZ4JNISafeDecompressor.INSTANCE, LZ4Factory.nativeInstance().safeDecompressor());
+-    assertEquals(LZ4JavaUnsafeSafeDecompressor.INSTANCE, LZ4Factory.unsafeInstance().safeDecompressor());
+     assertEquals(LZ4JavaSafeSafeDecompressor.INSTANCE, LZ4Factory.safeInstance().safeDecompressor());
+   }
+ 
+diff --git a/src/test/net/jpountz/xxhash/XXHashFactoryTest.java b/src/test/net/jpountz/xxhash/XXHashFactoryTest.java
+index c410220..2aae562 100644
+--- a/src/test/net/jpountz/xxhash/XXHashFactoryTest.java
++++ b/src/test/net/jpountz/xxhash/XXHashFactoryTest.java
+@@ -21,14 +21,10 @@ public class XXHashFactoryTest extends TestCase {
+   public void test() {
+     assertEquals(XXHash32JNI.INSTANCE, XXHashFactory.nativeInstance().hash32());
+     assertTrue(XXHashFactory.nativeInstance().newStreamingHash32(0) instanceof StreamingXXHash32JNI);
+-    assertEquals(XXHash32JavaUnsafe.INSTANCE, XXHashFactory.unsafeInstance().hash32());
+-    assertTrue(XXHashFactory.unsafeInstance().newStreamingHash32(0) instanceof StreamingXXHash32JavaUnsafe);
+     assertEquals(XXHash32JavaSafe.INSTANCE, XXHashFactory.safeInstance().hash32());
+     assertTrue(XXHashFactory.safeInstance().newStreamingHash32(0) instanceof StreamingXXHash32JavaSafe);
+     assertEquals(XXHash64JNI.INSTANCE, XXHashFactory.nativeInstance().hash64());
+     assertTrue(XXHashFactory.nativeInstance().newStreamingHash64(0) instanceof StreamingXXHash64JNI);
+-    assertEquals(XXHash64JavaUnsafe.INSTANCE, XXHashFactory.unsafeInstance().hash64());
+-    assertTrue(XXHashFactory.unsafeInstance().newStreamingHash64(0) instanceof StreamingXXHash64JavaUnsafe);
+     assertEquals(XXHash64JavaSafe.INSTANCE, XXHashFactory.safeInstance().hash64());
+     assertTrue(XXHashFactory.safeInstance().newStreamingHash64(0) instanceof StreamingXXHash64JavaSafe);
+   }

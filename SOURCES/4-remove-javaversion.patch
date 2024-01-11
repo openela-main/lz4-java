@@ -1,0 +1,15 @@
+diff --git a/build.xml b/build.xml
+index 8c08fd3..b46990d 100644
+--- a/build.xml
++++ b/build.xml
+@@ -54,10 +54,6 @@
+     <os family="mac"/>
+   </condition>
+ 
+-  <condition property="java10+">
+-    <javaversion atleast="10"/>
+-  </condition>
+-
+   <target name="clean" description="clean working copy">
+     <delete dir="${build}" />
+     <delete dir="${dist}" />

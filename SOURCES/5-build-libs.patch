@@ -1,0 +1,44 @@
+diff --git a/Makefile b/Makefile
+index 3495c8f..7b20f5c 100644
+--- a/Makefile
++++ b/Makefile
+@@ -4,22 +4,24 @@ BUILD_DIR = build
+ OBJECTS_DIR = $(BUILD_DIR)/objects
+ JNI_HEADERS_DIR = $(BUILD_DIR)/jni-headers
+ JNI_SOURCES_DIR = src/jni
+-INCLUDE = -I $(JAVA_HOME)/include -I $(JAVA_HOME)/include/linux
++LZ4_LIB_DIR = src/lz4/lib
++INCLUDE = -I $(JAVA_HOME)/include -I $(JAVA_HOME)/include/linux -I $(LZ4_LIB_DIR)
+ 
+-LIBS = -llz4 -lxxhash
+ JNI_PREFIX = net_jpountz_
+ 
+ default: all move_objects generate_so
+ 
+ all:
++	$(CC) -shared -o $(BUILD_DIR)/liblz4.so -fPIC $(LZ4_LIB_DIR)/lz4.c
++	$(CC) -shared -o $(BUILD_DIR)/liblz4hc.so -fPIC $(LZ4_LIB_DIR)/lz4hc.c
++	$(CC) -shared -o $(BUILD_DIR)/liblz4frame.so -fPIC $(LZ4_LIB_DIR)/lz4frame.c
++	$(CC) -shared -o $(BUILD_DIR)/libxxhash.so -fPIC $(LZ4_LIB_DIR)/xxhash.c
+ 	$(CC) -fPIC -I $(JNI_HEADERS_DIR) \
+ 		$(INCLUDE) \
+-		$(LIBS) \
+ 		-c $(JNI_SOURCES_DIR)/$(JNI_PREFIX)lz4_LZ4JNI.c
+ 
+ 	$(CC) -fPIC  -I $(JNI_HEADERS_DIR) \
+ 		$(INCLUDE) \
+-		$(LIBS) \
+ 		-c $(JNI_SOURCES_DIR)/$(JNI_PREFIX)xxhash_XXHashJNI.c
+ 
+ move_objects:
+@@ -28,6 +30,8 @@ move_objects:
+ generate_so:
+ 	gcc -fPIC -shared \
+ 		$(OBJECTS_DIR)/*.o \
+-		$(LIB_DIR)/liblz4.so \
+-		$(LIB_DIR)/libxxhash.so \
++		$(BUILD_DIR)/liblz4.so \
++		$(BUILD_DIR)/liblz4hc.so \
++		$(BUILD_DIR)/liblz4frame.so \
++		$(BUILD_DIR)/libxxhash.so \
+ 		-o $(BUILD_DIR)/jni/net/jpountz/util/$(PLATFORM)/$(ARCH)/liblz4-java.so
